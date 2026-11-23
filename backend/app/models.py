@@ -37,6 +37,8 @@ class DetectionCategory(enum.StrEnum):
 class TriageStatus(enum.StrEnum):
     auto_animal = "auto_animal"
     auto_empty = "auto_empty"
+    auto_person = "auto_person"
+    auto_vehicle = "auto_vehicle"
     needs_review = "needs_review"
     reviewed = "reviewed"
 
