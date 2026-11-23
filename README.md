@@ -1,6 +1,6 @@
 # CamTrap Lite
 
-**Demo video (2–3 min):** _link coming soon_ <!-- TODO: add the screen recording link -->
+**▶ [Demo video (2 min)](docs/demo.mp4)** · **[Step-by-step tutorial](docs/tutorial.md)**
 
 Camera traps produce huge numbers of images, and most of them are empty: wind, sun and
 grass set off the sensor. In the Snapshot Karoo data used here, **83% of images contain no
@@ -153,7 +153,7 @@ docker compose exec api python scripts/import_md_results.py --results /data/lila
 #   docker compose exec api python scripts/ingest_lila_subset.py --enqueue
 ```
 
-Then open <http://localhost:5173>: the dashboard, **Review** (`1` animal, `2` empty,
+New to the app? Follow the [tutorial](docs/tutorial.md). Then open <http://localhost:5173>: the dashboard, **Review** (`1` animal, `2` empty,
 `3` person, `4` vehicle, `←/→` images, `Z` undo, `?` help), **Static Check** (`Y`/`N`),
 **Masks** and **Export**. You can also upload your own images on the **Upload** page; they are queued for
 the worker automatically.
