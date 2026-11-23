@@ -18,6 +18,8 @@ class Settings(BaseSettings):
 
     # Processing
     batch_size: int = 20
+    # Detections below this are not stored (MegaDetector's "conservative" threshold).
+    detection_min_conf: float = 0.05
 
     # Event grouping
     event_gap_seconds: int = 60

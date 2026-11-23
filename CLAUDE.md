@@ -39,6 +39,13 @@ The goal is a **small, working, deployed** version of the core TrapTagger workfl
 - **Tests:** pytest for the backend, Vitest for any non-trivial frontend logic.
 - **Packaging:** `docker-compose.yml` that runs api + worker + postgres + frontend locally with one command.
 
+## Verified external API facts (checked 2026-11, update if they change)
+
+- **megadetector 10.0.x**: `megadetector.detection.run_detector.load_detector("MDV5A", force_cpu=...)` auto-downloads the weights (currently `md_v5a.0.1.pt`, ~280 MB) to `<tempdir>/megadetector_models` and returns a `PTDetector`; `detector.generate_detections_one_image(pil_img, image_id, detection_threshold)` returns `{file, detections: [{category: "1"|"2"|"3", conf, bbox: [x,y,w,h] normalised]}, failure}`. Load images with `megadetector.visualization.visualization_utils.load_image` (handles EXIF rotation). Batch CLI: `python -m megadetector.detection.run_detector_batch MDV5A <dir> <out.json> --recursive --output_relative_filenames`.
+- **CPU speed measured on the dev laptop: ~6 s/image** (slower than the 1–3 s estimate), so use the precomputed-results path for the full subset and the worker for small batches.
+- **LILA Snapshot Karoo S1**: metadata `https://storage.googleapis.com/public-datasets-lila/snapshot-safari/KAR/SnapshotKaroo_S1_v1.0.json.zip` (COCO Camera Traps; `images[].file_name/location/seq_id/datetime`, sequence-level annotations, category `empty`, `human`). Images: `https://storage.googleapis.com/public-datasets-lila/snapshot-safari/KAR/KAR_public/<file_name>`. Precomputed MDv5a results: `https://lila.science/public/lila-md-results/snapshot-safari_KAR_mdv5a.0.0_results.json.zip`, paths relative to `KAR_public/`. Karoo JPEGs have EXIF `DateTimeOriginal`.
+- `scripts/import_md_results.py --camera` is optional: without it, entries are matched against all cameras (the LILA subset spans 5 cameras). `scripts/ingest_lila_subset.py` loads the downloaded subset (one Camera per LILA location, sets `ground_truth_label`).
+
 ## Repository layout
 
 ```

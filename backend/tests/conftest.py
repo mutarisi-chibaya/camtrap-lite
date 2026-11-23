@@ -1,6 +1,7 @@
 """Shared fixtures: an in-memory SQLite database and a FastAPI test client."""
 
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,7 +11,10 @@ from sqlalchemy.pool import StaticPool
 
 from app import models  # noqa: F401
 from app.db import Base, get_db
+from app.deps import get_queue
 from app.main import app
+from app.queue import DbQueue
+from app.storage import LocalStorage, get_storage
 
 
 @pytest.fixture
@@ -29,8 +33,12 @@ def db() -> Iterator[Session]:
 
 
 @pytest.fixture
-def client(db: Session) -> Iterator[TestClient]:
+def client(db: Session, tmp_path: Path) -> Iterator[TestClient]:
+    storage = LocalStorage(tmp_path / "storage")
+    queue = DbQueue(sessionmaker(bind=db.get_bind(), expire_on_commit=False))
     app.dependency_overrides[get_db] = lambda: db
+    app.dependency_overrides[get_storage] = lambda: storage
+    app.dependency_overrides[get_queue] = lambda: queue
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()

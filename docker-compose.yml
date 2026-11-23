@@ -21,7 +21,7 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-camtrap}:${POSTGRES_PASSWORD:-camtrap}@db:5432/${POSTGRES_DB:-camtrap}
       STORAGE_DIR: /data/storage
     volumes:
-      - ./data/storage:/data/storage
+      - ./data:/data
     ports:
       - "8000:8000"
     depends_on:
@@ -29,8 +29,10 @@ services:
         condition: service_healthy
 
   worker:
-    build: ./backend
-    command: python -m worker.run
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    restart: unless-stopped  # retries if it starts before the API has migrated the DB
     env_file:
       - path: .env
         required: false
@@ -38,7 +40,8 @@ services:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-camtrap}:${POSTGRES_PASSWORD:-camtrap}@db:5432/${POSTGRES_DB:-camtrap}
       STORAGE_DIR: /data/storage
     volumes:
-      - ./data/storage:/data/storage
+      - ./data:/data
+      - mdmodels:/tmp/megadetector_models  # MegaDetector caches its weights here
     depends_on:
       api:
         condition: service_started
@@ -54,3 +57,4 @@ services:
 
 volumes:
   pgdata:
+  mdmodels:

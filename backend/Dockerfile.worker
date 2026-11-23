@@ -1,0 +1,21 @@
+# Worker image: the API image plus MegaDetector. Uses CPU-only PyTorch wheels to keep the
+# image small; for a GPU, run the worker outside Docker (`python -m worker.run`) instead.
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+# opencv (pulled in by megadetector) needs these shared libraries.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+
+RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+COPY pyproject.toml ./
+COPY app ./app
+COPY worker ./worker
+RUN pip install --no-cache-dir ".[ml]"
+
+COPY . .
+
+CMD ["python", "-m", "worker.run"]

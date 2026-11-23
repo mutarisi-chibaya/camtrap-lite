@@ -11,9 +11,15 @@ dependencies = [
     "pydantic>=2.6",
     "pydantic-settings>=2.2",
     "psycopg[binary]>=3.1",
+    "python-multipart>=0.0.9",
+    "Pillow>=10.0",
 ]
 
 [project.optional-dependencies]
+# MegaDetector (pulls in PyTorch); only the worker needs it.
+ml = [
+    "megadetector>=10.0",
+]
 dev = [
     "pytest>=8.0",
     "httpx>=0.27",
@@ -29,6 +35,7 @@ include = ["app*", "worker*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 100
