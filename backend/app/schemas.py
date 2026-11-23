@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models import ImageStatus, TimestampSource
+from app.models import AnnotationLabel, ImageStatus, TimestampSource, TriageStatus
 
 
 class CameraCreate(BaseModel):
@@ -76,3 +76,48 @@ class Stats(BaseModel):
     static_clusters_by_status: dict[str, int]
     review: ReviewStats
     thresholds: Thresholds
+
+
+class DetectionOut(BaseModel):
+    id: int
+    category: str
+    confidence: float
+    bbox: tuple[float, float, float, float]  # normalised x, y, w, h
+    is_static_candidate: bool
+
+
+class ReviewImage(BaseModel):
+    id: int
+    original_filename: str
+    width: int | None
+    height: int | None
+    timestamp: datetime | None
+    timestamp_source: TimestampSource
+    detections: list[DetectionOut]
+
+
+class ReviewEvent(BaseModel):
+    id: int
+    camera_id: int
+    camera_name: str
+    start_time: datetime | None
+    end_time: datetime | None
+    max_animal_conf: float | None
+    images: list[ReviewImage]
+
+
+class ReviewQueue(BaseModel):
+    events: list[ReviewEvent]
+    remaining: int  # all events still needing review (for the given camera filter)
+
+
+class ReviewDecision(BaseModel):
+    label: AnnotationLabel
+    review_duration_ms: int | None = Field(default=None, ge=0)
+
+
+class ReviewResult(BaseModel):
+    event_id: int
+    triage_status: TriageStatus
+    label: AnnotationLabel | None
+    remaining: int

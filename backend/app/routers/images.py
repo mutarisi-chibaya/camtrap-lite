@@ -1,4 +1,6 @@
 import mimetypes
+from collections.abc import Iterator
+from typing import BinaryIO
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -22,4 +24,12 @@ def get_image_file(image_id: int, db: DbSession, storage: StorageDep) -> Streami
     media_type = mimetypes.guess_type(image.storage_key)[0] or "application/octet-stream"
     # Image files never change once stored, so the browser can cache them for the review UI.
     headers = {"Cache-Control": "public, max-age=86400, immutable"}
-    return StreamingResponse(fh, media_type=media_type, headers=headers)
+    return StreamingResponse(_chunks(fh), media_type=media_type, headers=headers)
+
+
+def _chunks(fh: BinaryIO, size: int = 256 * 1024) -> Iterator[bytes]:
+    """Fixed-size blocks. Iterating a binary file directly yields "lines" split on newline
+    bytes: thousands of tiny chunks per JPEG, which made serving an image take seconds."""
+    with fh:
+        while chunk := fh.read(size):
+            yield chunk

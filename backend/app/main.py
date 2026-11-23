@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from sqlalchemy import text
 
 from app.db import DbSession
-from app.routers import cameras, images, stats
+from app.routers import cameras, images, review, stats
 
 app = FastAPI(
     title="CamTrap Lite",
@@ -14,6 +14,7 @@ app = FastAPI(
 app.include_router(cameras.router)
 app.include_router(images.router)
 app.include_router(stats.router)
+app.include_router(review.router)
 
 
 @app.get("/health", tags=["meta"])
