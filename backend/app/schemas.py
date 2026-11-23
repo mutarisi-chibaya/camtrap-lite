@@ -4,7 +4,13 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models import AnnotationLabel, ImageStatus, TimestampSource, TriageStatus
+from app.models import (
+    AnnotationLabel,
+    ImageStatus,
+    StaticClusterStatus,
+    TimestampSource,
+    TriageStatus,
+)
 
 
 class CameraCreate(BaseModel):
@@ -121,3 +127,29 @@ class ReviewResult(BaseModel):
     triage_status: TriageStatus
     label: AnnotationLabel | None
     remaining: int
+
+
+class StaticSample(BaseModel):
+    image_id: int
+    detection_id: int
+    bbox: tuple[float, float, float, float]
+    confidence: float
+    category: str
+    timestamp: datetime | None
+    width: int | None
+    height: int | None
+
+
+class StaticClusterOut(BaseModel):
+    id: int
+    camera_id: int
+    camera_name: str
+    bbox: tuple[float, float, float, float]  # representative box, normalised
+    occurrence_count: int
+    occurrence_fraction: float
+    status: StaticClusterStatus
+    samples: list[StaticSample]
+
+
+class StaticClusterUpdate(BaseModel):
+    status: StaticClusterStatus

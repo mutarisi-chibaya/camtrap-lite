@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { boxStyle } from "./boxes";
+import { boxStyle, cropStyle } from "./boxes";
 
 describe("boxStyle", () => {
   it("converts normalised xywh to percentages", () => {
@@ -18,5 +18,28 @@ describe("boxStyle", () => {
     expect(s.top).toBe("0%");
     expect(parseFloat(String(s.width))).toBeCloseTo(10);
     expect(parseFloat(String(s.height))).toBeCloseTo(40);
+  });
+});
+
+describe("cropStyle", () => {
+  const num = (v: unknown) => parseFloat(String(v));
+
+  it("does not zoom large boxes", () => {
+    const s = cropStyle([0.0, 0.0, 0.9, 0.94]);
+    expect(num(s.width)).toBeCloseTo(100);
+    expect(num(s.left)).toBeCloseTo(0);
+  });
+
+  it("zooms and centres a small box", () => {
+    const s = cropStyle([0.45, 0.45, 0.1, 0.1]); // centre 0.5, zoom 5
+    expect(num(s.width)).toBeCloseTo(500);
+    expect(num(s.left)).toBeCloseTo(-200); // 0.5 - 0.5 * 5 = -2
+  });
+
+  it("never shows past the image edge", () => {
+    const s = cropStyle([0.0, 0.95, 0.05, 0.05]); // corner box, zoom 6 (capped)
+    expect(num(s.width)).toBeCloseTo(600);
+    expect(num(s.left)).toBeCloseTo(0);
+    expect(num(s.top)).toBeCloseTo(-500); // 1 - zoom
   });
 });

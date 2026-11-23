@@ -176,3 +176,41 @@ export function uploadImages(
     xhr.send(form);
   });
 }
+
+// ---- static clusters & exports ----
+
+export type StaticStatus = "pending" | "confirmed_static" | "rejected";
+
+export interface StaticSample {
+  image_id: number;
+  detection_id: number;
+  bbox: [number, number, number, number];
+  confidence: number;
+  category: string;
+  timestamp: string | null;
+  width: number | null;
+  height: number | null;
+}
+
+export interface StaticCluster {
+  id: number;
+  camera_id: number;
+  camera_name: string;
+  bbox: [number, number, number, number];
+  occurrence_count: number;
+  occurrence_fraction: number;
+  status: StaticStatus;
+  samples: StaticSample[];
+}
+
+export const getStaticClusters = (opts: { cameraId?: number; status?: StaticStatus } = {}) =>
+  request<StaticCluster[]>(
+    "GET",
+    `/static-clusters${query({ camera_id: opts.cameraId, status: opts.status })}`,
+  );
+
+export const setStaticStatus = (clusterId: number, status: StaticStatus) =>
+  request<StaticCluster>("POST", `/static-clusters/${clusterId}`, { status });
+
+export const exportUrl = (format: "csv" | "coco", opts: { cameraId?: number; minConf?: number }) =>
+  `${BASE}/exports/${format}${query({ camera_id: opts.cameraId, min_conf: opts.minConf })}`;
