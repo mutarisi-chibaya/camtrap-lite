@@ -248,6 +248,13 @@ docs/         results.md, cloud-design.md, img/
 - **Auth and projects**: real users, organisations and per-project thresholds instead of
   one optional API key.
 
+## Use of AI assistance
+
+I built this project with the help of an AI coding assistant (Claude, by Anthropic), which
+wrote much of the code from my specification ([CLAUDE.md](CLAUDE.md)). The scope, design
+decisions, data choices, testing and review of the results are mine, and I take full
+responsibility for the code and the claims in this repository.
+
 ---
 
 Images: Snapshot Karoo (Snapshot Safari), via [LILA BC](https://lila.science/datasets/snapshot-karoo);
