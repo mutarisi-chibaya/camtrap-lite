@@ -79,3 +79,27 @@ def group_events(db: Session, camera_id: int) -> list[Event]:
             by_id[member.id].event_id = event.id
         events.append(event)
     return events
+
+
+def release_untimed_events(db: Session, camera_id: int) -> int:
+    """Dissolve the camera's timestamp-less events that no human has reviewed.
+
+    Used after OCR fills in timestamps: those images were single-image events only because
+    their time was unknown. Their images are detached so `group_events` can regroup them.
+    Returns the number of events removed.
+    """
+    events = list(
+        db.scalars(
+            select(Event).where(
+                Event.camera_id == camera_id,
+                Event.start_time.is_(None),
+                Event.triage_status != TriageStatus.reviewed,
+            )
+        )
+    )
+    for event in events:
+        for img in event.images:
+            img.event_id = None
+        db.delete(event)  # cascades to its AI annotations
+    db.flush()
+    return len(events)

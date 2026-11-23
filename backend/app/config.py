@@ -30,6 +30,12 @@ class Settings(BaseSettings):
     static_min_fraction: float = 0.1
     static_min_count: int = 5
 
+    # Timestamp OCR (only for images without EXIF / filename timestamps)
+    ocr_enabled: bool = True
+    ocr_min_year: int = 2000
+    ocr_date_order: str = "MDY"  # how to read ambiguous dates like 04/10/2017; or "DMY"
+    ocr_max_days_from_camera: int = 30
+
     # Triage
     auto_accept_conf: float = 0.80
     auto_empty_conf: float = 0.10

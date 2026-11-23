@@ -19,6 +19,7 @@ dependencies = [
 # MegaDetector (pulls in PyTorch); only the worker needs it.
 ml = [
     "megadetector>=10.0",
+    "easyocr>=1.7",
 ]
 dev = [
     "pytest>=8.0",

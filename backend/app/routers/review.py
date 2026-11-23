@@ -28,6 +28,7 @@ from app.schemas import (
     ReviewQueue,
     ReviewResult,
 )
+from app.services.masks import Polygon, is_masked, load_masks
 from app.services.triage import triage_events
 
 router = APIRouter(prefix="/review", tags=["review"])
@@ -44,7 +45,7 @@ def _remaining(db: Session, camera_id: int | None = None) -> int:
     return db.scalar(q) or 0
 
 
-def _to_review_event(event: Event) -> ReviewEvent:
+def _to_review_event(event: Event, polygons: list[Polygon]) -> ReviewEvent:
     images = sorted(event.images, key=lambda i: (i.timestamp is None, i.timestamp, i.id))
     return ReviewEvent(
         id=event.id,
@@ -68,6 +69,7 @@ def _to_review_event(event: Event) -> ReviewEvent:
                         confidence=d.confidence,
                         bbox=(d.bbox_x, d.bbox_y, d.bbox_w, d.bbox_h),
                         is_static_candidate=d.is_static_candidate,
+                        is_masked=is_masked((d.bbox_x, d.bbox_y, d.bbox_w, d.bbox_h), polygons),
                     )
                     for d in sorted(i.detections, key=lambda d: -d.confidence)
                 ],
@@ -100,8 +102,10 @@ def next_events(
     if exclude:
         q = q.where(Event.id.not_in(exclude))
     events = db.scalars(q).all()
+    masks = load_masks(db, {e.camera_id for e in events})
     return ReviewQueue(
-        events=[_to_review_event(e) for e in events], remaining=_remaining(db, camera_id)
+        events=[_to_review_event(e, masks.get(e.camera_id, [])) for e in events],
+        remaining=_remaining(db, camera_id),
     )
 
 

@@ -23,6 +23,7 @@ from app.models import (
     StaticCluster,
     StaticClusterStatus,
 )
+from app.services.masks import is_masked, load_masks
 
 BBox = tuple[float, float, float, float]  # normalised x, y, w, h
 
@@ -121,9 +122,12 @@ def find_static_clusters(db: Session, camera_id: int) -> list[StaticCluster]:
             .where(Image.camera_id == camera_id, Detection.confidence >= s.static_min_conf)
         )
     )
+    # Masked areas are already handled by a human, so no clusters are suggested there.
+    polygons = load_masks(db, [camera_id]).get(camera_id, [])
     boxes = [
         Box(d.id, d.image_id, d.confidence, (d.bbox_x, d.bbox_y, d.bbox_w, d.bbox_h))
         for d in detections
+        if not is_masked((d.bbox_x, d.bbox_y, d.bbox_w, d.bbox_h), polygons)
     ]
     candidates = static_candidates(
         cluster_boxes(boxes, s.static_iou), total_images, s.static_min_fraction, s.static_min_count

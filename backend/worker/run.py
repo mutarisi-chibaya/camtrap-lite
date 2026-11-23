@@ -9,8 +9,10 @@ cannot be decoded are marked `failed` individually so one bad file doesn't sink 
 """
 
 import argparse
+import io
 import logging
 import time
+from collections.abc import Callable
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
@@ -18,12 +20,29 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.config import get_settings
 from app.db import SessionLocal
 from app.ml.detector import Detector, MegaDetector, gpu_available
+from app.ml.ocr import BannerReader, EasyOcrBannerReader
 from app.models import Image, ImageStatus
 from app.queue import DbQueue, JobQueue, QueuedJob
+from app.services.ocr_fill import fill_timestamp
 from app.services.pipeline import finalize_cameras_if_done, save_detections
 from app.storage import Storage, get_storage
 
 log = logging.getLogger("worker")
+
+OcrProvider = Callable[[], BannerReader]
+
+
+def lazy_ocr(gpu: bool) -> OcrProvider:
+    """Load the OCR model only when the first image without a timestamp shows up."""
+    reader: list[BannerReader] = []
+
+    def get() -> BannerReader:
+        if not reader:
+            log.info("loading EasyOCR for banner timestamps")
+            reader.append(EasyOcrBannerReader(gpu=gpu))
+        return reader[0]
+
+    return get
 
 
 def process_job(
@@ -31,6 +50,7 @@ def process_job(
     detector: Detector,
     storage: Storage,
     sessions: sessionmaker[Session] = SessionLocal,
+    ocr: OcrProvider | None = None,
 ) -> int:
     """Run detection for one job's images. Returns the number of images processed."""
     image_ids = job.payload.get("image_ids", [])
@@ -41,7 +61,11 @@ def process_job(
                 continue  # already done in an earlier, partially failed attempt
             try:
                 with storage.open_read(image.storage_key) as fh:
-                    results = detector.detect(fh, image.original_filename)
+                    data = fh.read()
+                if image.timestamp is None and ocr is not None:
+                    # Before detection, so post-processing can group this image in time.
+                    fill_timestamp(db, ocr(), image, data)
+                results = detector.detect(io.BytesIO(data), image.original_filename)
             except (FileNotFoundError, OSError, ValueError) as e:
                 log.warning("image %s failed: %s", image.id, e)
                 image.status = ImageStatus.failed
@@ -53,7 +77,13 @@ def process_job(
     return len(images)
 
 
-def run(queue: JobQueue, detector: Detector, storage: Storage, poll_seconds: float) -> None:
+def run(
+    queue: JobQueue,
+    detector: Detector,
+    storage: Storage,
+    poll_seconds: float,
+    ocr: OcrProvider | None = None,
+) -> None:
     total, started = 0, time.monotonic()
     while True:
         job = queue.claim()
@@ -62,7 +92,7 @@ def run(queue: JobQueue, detector: Detector, storage: Storage, poll_seconds: flo
             continue
         t0 = time.monotonic()
         try:
-            n = process_job(job, detector, storage)
+            n = process_job(job, detector, storage, ocr=ocr)
         except Exception as e:  # noqa: BLE001 - any failure goes back to the queue
             log.exception("job %s failed (attempt %s)", job.id, job.attempts)
             queue.fail(job.id, repr(e))
@@ -102,7 +132,8 @@ def main() -> None:
     detector = MegaDetector(args.model, settings.detection_min_conf, force_cpu=args.cpu)
     _configure_logging()  # megadetector adds its own root handlers on load; reset them
     log.info("model loaded; waiting for jobs")
-    run(DbQueue(SessionLocal), detector, get_storage(), args.poll)
+    ocr = lazy_ocr(gpu_available() and not args.cpu) if settings.ocr_enabled else None
+    run(DbQueue(SessionLocal), detector, get_storage(), args.poll, ocr)
 
 
 if __name__ == "__main__":

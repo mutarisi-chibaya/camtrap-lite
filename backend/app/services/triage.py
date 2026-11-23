@@ -24,6 +24,7 @@ from app.models import (
     StaticClusterStatus,
     TriageStatus,
 )
+from app.services.masks import is_masked, load_masks
 
 AUTO_LABELS = {
     TriageStatus.auto_animal: AnnotationLabel.animal,
@@ -37,7 +38,7 @@ AUTO_LABELS = {
 class TriageDet:
     category: str
     confidence: float
-    confirmed_static: bool = False
+    ignored: bool = False  # in a confirmed static cluster, or inside a camera mask
 
 
 @dataclass(frozen=True)
@@ -49,13 +50,13 @@ class TriageDecision:
 def decide(dets: list[TriageDet], accept_conf: float, empty_conf: float) -> TriageDecision:
     """Triage one event from all detections across its images.
 
-    Detections in a human-confirmed static cluster are ignored. Person beats vehicle beats
-    animal when several are confident: images of people matter most (privacy) and are the
-    rarest, so they should never be hidden inside an "animal" event.
+    Ignored detections (confirmed static clusters, camera masks) do not count. Person beats
+    vehicle beats animal when several are confident: images of people matter most (privacy)
+    and are the rarest, so they should never be hidden inside an "animal" event.
     """
     best: dict[str, float] = defaultdict(float)
     for d in dets:
-        if not d.confirmed_static:
+        if not d.ignored:
             best[d.category] = max(best[d.category], d.confidence)
     animal = best.get("animal")
     top = {c: best.get(c, 0.0) for c in ("animal", "person", "vehicle")}
@@ -73,23 +74,44 @@ def decide(dets: list[TriageDet], accept_conf: float, empty_conf: float) -> Tria
     return TriageDecision(status, animal)
 
 
+def event_detections(db: Session, event_ids: list[int] | None = None) -> dict[int, list[TriageDet]]:
+    """event_id -> detections, with `ignored` set for confirmed-static or masked boxes."""
+    q = (
+        select(
+            Image.event_id,
+            Image.camera_id,
+            Detection.category,
+            Detection.confidence,
+            Detection.bbox_x,
+            Detection.bbox_y,
+            Detection.bbox_w,
+            Detection.bbox_h,
+            StaticCluster.status,
+        )
+        .join(Image, Detection.image_id == Image.id)
+        .outerjoin(StaticCluster, Detection.static_cluster_id == StaticCluster.id)
+        .where(Image.event_id.is_not(None))
+    )
+    if event_ids is not None:
+        q = q.where(Image.event_id.in_(event_ids))
+    rows = db.execute(q).all()
+    masks = load_masks(db, {r.camera_id for r in rows})
+    out: dict[int, list[TriageDet]] = defaultdict(list)
+    for event_id, camera_id, category, conf, x, y, w, h, cluster_status in rows:
+        ignored = cluster_status == StaticClusterStatus.confirmed_static or is_masked(
+            (x, y, w, h), masks.get(camera_id, [])
+        )
+        out[event_id].append(TriageDet(category.value, conf, ignored))
+    return out
+
+
 def triage_events(db: Session, events: list[Event]) -> None:
     """(Re)triage events. Human-reviewed events keep their status and annotations."""
     if not events:
         return
     s = get_settings()
     ids = [e.id for e in events]
-    rows = db.execute(
-        select(Image.event_id, Detection.category, Detection.confidence, StaticCluster.status)
-        .join(Image, Detection.image_id == Image.id)
-        .outerjoin(StaticCluster, Detection.static_cluster_id == StaticCluster.id)
-        .where(Image.event_id.in_(ids))
-    ).all()
-    dets: dict[int, list[TriageDet]] = defaultdict(list)
-    for event_id, category, conf, cluster_status in rows:
-        dets[event_id].append(
-            TriageDet(category.value, conf, cluster_status == StaticClusterStatus.confirmed_static)
-        )
+    dets = event_detections(db, ids)
 
     open_ids = [e.id for e in events if e.triage_status != TriageStatus.reviewed]
     db.execute(

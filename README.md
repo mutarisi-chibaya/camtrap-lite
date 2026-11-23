@@ -16,6 +16,9 @@ version of the core [TrapTagger](https://wildeyeconservation.org/) workflow:
 6. send only the uncertain events to a fast, keyboard-driven review screen;
 7. export the results as CSV and COCO JSON.
 
+Two extras: **timestamp OCR**, which reads the date banner printed on an image when EXIF
+is missing, and **polygon masks**, which hide detections in waving grass.
+
 ![Reviewing events with the keyboard](docs/img/review.gif)
 
 ## Results
@@ -99,6 +102,37 @@ box that fills most of the frame in 12.9% of one camera's images, which is typic
 false trigger. The crops show it is really large antelopes standing in front of the camera
 on three different days, so the right answer is **reject**.
 
+## Extras: timestamp OCR and grass masks
+
+**Timestamp OCR.** Some images arrive with no EXIF data, for example after being
+re-saved by other software. Without a timestamp, an image can't be grouped into an event.
+The worker then reads the date banner the camera printed on the image with EasyOCR. It
+reads only thin strips at the bottom and top, and it loads the model only when the first
+image without a timestamp turns up.
+
+Every reading is checked before use. A result is rejected if:
+
+- the date or time is impossible, such as 30 February or "13 PM";
+- it is in the future;
+- it is before `OCR_MIN_YEAR`;
+- it is more than `OCR_MAX_DAYS_FROM_CAMERA` days outside the times of the camera's other
+  images. This catches a camera whose clock reset to its factory date.
+
+Ambiguous dates are read in `OCR_DATE_ORDER` (MDY by default). On 40 Karoo images that
+also have EXIF, the OCR time matched EXIF to the minute **40 of 40 times** (3.5 s per image
+on CPU). Check it yourself with `scripts/ocr_timestamps.py --compare 40`. The same script
+backfills images that came in through the importer and regroups their events.
+
+**Polygon masks.** Grass and branches moving in the wind trigger detections that wander
+around a region, so they never form a tight static cluster. On the **Masks** page you click
+a polygon over that region; the page shows every detection box of the camera, with dots at
+the box centres. A detection is masked when its box centre is inside a polygon, and the
+dots turn grey live as you draw. Saving a mask re-runs the static finder and triage for that
+camera. Masked detections are ignored by triage, the static finder and exports, and are
+shown dotted on the Review page. Deleting the mask brings them back.
+
+![Mask editor](docs/img/masks.png)
+
 ## Quick start
 
 Requirements: Docker. Python 3.11 is needed only for the download script.
@@ -120,8 +154,8 @@ docker compose exec api python scripts/import_md_results.py --results /data/lila
 ```
 
 Then open <http://localhost:5173>: the dashboard, **Review** (`1` animal, `2` empty,
-`3` person, `4` vehicle, `←/→` images, `Z` undo, `?` help), **Static Check** (`Y`/`N`) and
-**Export**. You can also upload your own images on the **Upload** page; they are queued for
+`3` person, `4` vehicle, `←/→` images, `Z` undo, `?` help), **Static Check** (`Y`/`N`),
+**Masks** and **Export**. You can also upload your own images on the **Upload** page; they are queued for
 the worker automatically.
 
 On Windows Git Bash, prefix commands that contain `/data/...` paths with
@@ -134,7 +168,7 @@ DATABASE_URL=postgresql+psycopg://camtrap:camtrap@localhost:5432/camtrap \
 STORAGE_DIR=../data/storage python scripts/evaluate.py     # writes docs/results.md
 ```
 
-Tests: `cd backend && pytest` (77 tests) · `cd frontend && npm test` (Vitest) ·
+Tests: `cd backend && pytest` (112 tests) · `cd frontend && npm test` (Vitest) ·
 `ruff check .` · `npx tsc --noEmit`.
 
 ## Design decisions
@@ -188,11 +222,13 @@ another model is a one-file change.
 ```
 backend/
   app/        FastAPI app: models, routers, services (ingest, events, static, triage,
-              exports, evaluation), storage/, queue/, ml/detector.py
+              masks, timestamp_ocr, exports, evaluation), storage/, queue/,
+              ml/detector.py, ml/ocr.py
   worker/     detection worker (python -m worker.run)
-  scripts/    download_lila_subset · ingest_lila_subset · import_md_results · evaluate
+  scripts/    download_lila_subset · ingest_lila_subset · import_md_results · evaluate ·
+              ocr_timestamps
   tests/      pytest
-frontend/src/ api client, pages (Dashboard, Upload, Review, StaticCheck, Export),
+frontend/src/ api client, pages (Dashboard, Upload, Review, StaticCheck, Masks, Export),
               components, review/queue.ts (pure, unit-tested review state)
 notebooks/    Colab notebook to run MegaDetector on a GPU
 docs/         results.md, cloud-design.md, img/
@@ -205,8 +241,8 @@ docs/         results.md, cloud-design.md, img/
   [docs/cloud-design.md](docs/cloud-design.md).
 - **Species classification** for the `auto_animal` events (for example SpeciesNet), with
   the same "confident → automatic, uncertain → human" triage per species.
-- **Timestamp OCR** of the date banner on each image, as a fallback when EXIF is missing
-  or the camera clock was wrong, with checks that reject impossible dates.
+- **Clock-drift detection**: run OCR on a sample of every camera, even when EXIF is
+  present, and flag cameras whose EXIF and banner disagree.
 - **Several annotators at once**: lease events to a reviewer (like the job queue does),
   and use agreement between annotators to spot hard events.
 - **Auth and projects**: real users, organisations and per-project thresholds instead of

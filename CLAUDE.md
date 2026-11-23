@@ -89,11 +89,12 @@ camtrap-lite/
 ## Data model
 
 - **Camera**: id, name, site_name, latitude (nullable), longitude (nullable)
-- **Image**: id, camera_id, original_filename, storage_key, width, height, timestamp (nullable), timestamp_source (`exif` | `filename` | `missing`), event_id (nullable), status (`uploaded` | `queued` | `processed` | `failed`), ground_truth_label (nullable; only set for LILA evaluation data)
+- **Image**: id, camera_id, original_filename, storage_key, width, height, timestamp (nullable), timestamp_source (`exif` | `filename` | `ocr` | `missing`; `ocr` added with the stretch goal), event_id (nullable), status (`uploaded` | `queued` | `processed` | `failed`), ground_truth_label (nullable; only set for LILA evaluation data)
 - **Detection**: id, image_id, category (`animal` | `person` | `vehicle`), confidence (float), bbox_x, bbox_y, bbox_w, bbox_h (**normalised 0–1, top-left x/y plus width/height**, the same convention as MegaDetector), is_static_candidate (bool), static_cluster_id (nullable)
 - **Event**: id, camera_id, start_time, end_time, triage_status (`auto_animal` | `auto_empty` | `auto_person` | `auto_vehicle` | `needs_review` | `reviewed`; person/vehicle values added in M3, stored as VARCHAR so no migration was needed), max_animal_conf
 - **Annotation**: id, event_id, label (`animal` | `empty` | `person` | `vehicle`), source (`ai` | `human`), created_at, review_duration_ms (nullable)
 - **StaticCluster**: id, camera_id, bbox (normalised), occurrence_count, occurrence_fraction, status (`pending` | `confirmed_static` | `rejected`)
+- **CameraMask** (stretch goal, migration 0002): id, camera_id, name, polygon (JSON list of normalised [x, y] points), created_at. A detection whose box centre lies inside a mask is ignored by triage, the static finder and exports.
 - **Job**: id, type (`detect`), payload (JSON), status (`pending` | `running` | `done` | `failed`), attempts, error, created_at, updated_at
 
 ## Core logic (write unit tests for every rule here)

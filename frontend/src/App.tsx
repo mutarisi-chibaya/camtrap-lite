@@ -1,6 +1,7 @@
 import { NavLink, Route, Routes } from "react-router-dom";
 import Dashboard from "./pages/Dashboard";
 import Export from "./pages/Export";
+import Masks from "./pages/Masks";
 import Review from "./pages/Review";
 import StaticCheck from "./pages/StaticCheck";
 import Upload from "./pages/Upload";
@@ -10,6 +11,7 @@ const NAV = [
   { to: "/upload", label: "Upload" },
   { to: "/review", label: "Review" },
   { to: "/static", label: "Static Check" },
+  { to: "/masks", label: "Masks" },
   { to: "/export", label: "Export" },
 ];
 
@@ -32,6 +34,7 @@ export default function App() {
           <Route path="/upload" element={<Upload />} />
           <Route path="/review" element={<Review />} />
           <Route path="/static" element={<StaticCheck />} />
+          <Route path="/masks" element={<Masks />} />
           <Route path="/export" element={<Export />} />
           <Route path="*" element={<p>Page not found.</p>} />
         </Routes>

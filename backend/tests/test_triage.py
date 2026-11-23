@@ -72,7 +72,7 @@ def test_confident_animal_with_uncertain_person_is_animal() -> None:
 
 
 def test_confirmed_static_detections_are_ignored() -> None:
-    rock = TriageDet("animal", 0.6, confirmed_static=True)
+    rock = TriageDet("animal", 0.6, ignored=True)
     assert _status(rock) == TriageStatus.auto_empty
     d = decide([rock, TriageDet("animal", 0.4)], ACCEPT, EMPTY)
     assert d.status == TriageStatus.needs_review

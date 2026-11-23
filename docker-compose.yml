@@ -45,6 +45,7 @@ services:
     volumes:
       - ./data:/data
       - mdmodels:/tmp/megadetector_models  # MegaDetector caches its weights here
+      - ocrmodels:/root/.EasyOCR  # EasyOCR caches its models here
     depends_on:
       api:
         condition: service_started
@@ -61,3 +62,4 @@ services:
 volumes:
   pgdata:
   mdmodels:
+  ocrmodels:

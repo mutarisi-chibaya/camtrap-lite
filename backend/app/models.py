@@ -18,6 +18,7 @@ from app.db import Base
 class TimestampSource(enum.StrEnum):
     exif = "exif"
     filename = "filename"
+    ocr = "ocr"  # read from the date banner printed on the image
     missing = "missing"
 
 
@@ -92,6 +93,18 @@ class Camera(Base):
     longitude: Mapped[float | None] = mapped_column(Float)
 
     images: Mapped[list["Image"]] = relationship(back_populates="camera")
+
+
+class CameraMask(Base):
+    """A polygon (normalised 0-1 points) whose detections are ignored, e.g. waving grass."""
+
+    __tablename__ = "camera_masks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    camera_id: Mapped[int] = mapped_column(ForeignKey("cameras.id"), index=True)
+    name: Mapped[str] = mapped_column(String(200), default="")
+    polygon: Mapped[list[list[float]]] = mapped_column(JSON)  # [[x, y], ...]
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Event(Base):

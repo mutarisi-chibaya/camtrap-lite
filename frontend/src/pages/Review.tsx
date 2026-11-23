@@ -239,7 +239,15 @@ function ReviewSession({ cameraId }: { cameraId?: number }) {
           <div className="review-meta">
             <span className="camera-chip">{current.camera_name}</span>
             {current.start_time ? (
-              <span>{new Date(current.start_time).toLocaleString()}</span>
+              <span>
+                {new Date(current.start_time).toLocaleString()}
+                {current.images.some((i) => i.timestamp_source === "ocr") && (
+                  <span className="badge-info" title="Read from the date banner printed on the image">
+                    {" "}
+                    time from OCR
+                  </span>
+                )}
+              </span>
             ) : (
               <span className="badge-warning">No timestamp: single-image event</span>
             )}

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models import (
     AnnotationLabel,
@@ -90,6 +90,7 @@ class DetectionOut(BaseModel):
     confidence: float
     bbox: tuple[float, float, float, float]  # normalised x, y, w, h
     is_static_candidate: bool
+    is_masked: bool = False
 
 
 class ReviewImage(BaseModel):
@@ -153,3 +154,33 @@ class StaticClusterOut(BaseModel):
 
 class StaticClusterUpdate(BaseModel):
     status: StaticClusterStatus
+
+
+class MaskCreate(BaseModel):
+    name: str = Field(default="", max_length=200)
+    polygon: list[tuple[float, float]] = Field(min_length=3, max_length=200)
+
+    @field_validator("polygon")
+    @classmethod
+    def _normalised(cls, v: list[tuple[float, float]]) -> list[tuple[float, float]]:
+        if any(not (0 <= x <= 1 and 0 <= y <= 1) for x, y in v):
+            raise ValueError("polygon points must be normalised to 0-1")
+        return v
+
+
+class MaskOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    camera_id: int
+    name: str
+    polygon: list[tuple[float, float]]
+    created_at: datetime
+
+
+class CameraBox(BaseModel):
+    image_id: int
+    category: str
+    confidence: float
+    bbox: tuple[float, float, float, float]
+    is_masked: bool

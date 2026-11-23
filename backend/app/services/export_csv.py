@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models import Detection, Image, StaticCluster, StaticClusterStatus
 from app.services.labels import final_labels
+from app.services.masks import is_masked, load_masks
 
 COLUMNS = [
     "image_id",
@@ -29,18 +30,23 @@ COLUMNS = [
 
 
 def countable_detections(db: Session, image_ids: list[int]) -> dict[int, list[Detection]]:
-    """image_id -> detections, excluding those in human-confirmed static clusters."""
+    """image_id -> detections, excluding confirmed-static clusters and camera masks."""
     if not image_ids:
         return {}
     rows = db.execute(
-        select(Detection, StaticCluster.status)
+        select(Detection, Image.camera_id, StaticCluster.status)
+        .join(Image, Detection.image_id == Image.id)
         .outerjoin(StaticCluster, Detection.static_cluster_id == StaticCluster.id)
         .where(Detection.image_id.in_(image_ids))
     ).all()
+    masks = load_masks(db, {cam for _, cam, _ in rows})
     out: dict[int, list[Detection]] = defaultdict(list)
-    for det, cluster_status in rows:
-        if cluster_status != StaticClusterStatus.confirmed_static:
-            out[det.image_id].append(det)
+    for det, camera_id, cluster_status in rows:
+        if cluster_status == StaticClusterStatus.confirmed_static:
+            continue
+        if is_masked((det.bbox_x, det.bbox_y, det.bbox_w, det.bbox_h), masks.get(camera_id, [])):
+            continue
+        out[det.image_id].append(det)
     return out
 
 

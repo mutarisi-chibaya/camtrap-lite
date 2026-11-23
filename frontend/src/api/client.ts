@@ -83,6 +83,7 @@ export interface DetectionOut {
   confidence: number;
   bbox: [number, number, number, number];
   is_static_candidate: boolean;
+  is_masked: boolean;
 }
 
 export interface ReviewImage {
@@ -91,7 +92,7 @@ export interface ReviewImage {
   width: number | null;
   height: number | null;
   timestamp: string | null;
-  timestamp_source: "exif" | "filename" | "missing";
+  timestamp_source: "exif" | "filename" | "ocr" | "missing";
   detections: DetectionOut[];
 }
 
@@ -214,3 +215,45 @@ export const setStaticStatus = (clusterId: number, status: StaticStatus) =>
 
 export const exportUrl = (format: "csv" | "coco", opts: { cameraId?: number; minConf?: number }) =>
   `${BASE}/exports/${format}${query({ camera_id: opts.cameraId, min_conf: opts.minConf })}`;
+
+// ---- masks ----
+
+export interface Mask {
+  id: number;
+  camera_id: number;
+  name: string;
+  polygon: [number, number][];
+  created_at: string;
+}
+
+export interface CameraBox {
+  image_id: number;
+  category: string;
+  confidence: number;
+  bbox: [number, number, number, number];
+  is_masked: boolean;
+}
+
+export interface CameraImage {
+  id: number;
+  original_filename: string;
+  width: number | null;
+  height: number | null;
+  timestamp: string | null;
+}
+
+export const getMasks = (cameraId: number) => request<Mask[]>("GET", `/cameras/${cameraId}/masks`);
+
+export const createMask = (cameraId: number, body: { name: string; polygon: [number, number][] }) =>
+  request<Mask>("POST", `/cameras/${cameraId}/masks`, body);
+
+export async function deleteMask(maskId: number): Promise<void> {
+  const res = await fetch(`${BASE}/masks/${maskId}`, { method: "DELETE", headers: headers() });
+  if (!res.ok) throw new Error(`DELETE /masks/${maskId} failed: ${res.status}`);
+}
+
+export const getCameraImages = (cameraId: number, limit = 50) =>
+  request<CameraImage[]>("GET", `/cameras/${cameraId}/images${query({ limit })}`);
+
+export const getCameraBoxes = (cameraId: number, minConf = 0.2) =>
+  request<CameraBox[]>("GET", `/cameras/${cameraId}/boxes${query({ min_conf: minConf })}`);

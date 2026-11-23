@@ -18,7 +18,7 @@ import platform
 import random
 import sys
 import time
-from collections import Counter, defaultdict
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
@@ -31,12 +31,10 @@ from app.models import (
     Annotation,
     AnnotationSource,
     Camera,
-    Detection,
     Event,
     Image,
     ImageStatus,
     StaticCluster,
-    StaticClusterStatus,
 )
 from app.services.evaluation import (
     ImageRow,
@@ -51,7 +49,7 @@ from app.services.evaluation import (
     to_events,
 )
 from app.services.labels import final_labels
-from app.services.triage import TriageDet
+from app.services.triage import TriageDet, event_detections
 from app.storage import get_storage
 
 DEFAULT_OUT = Path(__file__).resolve().parents[2] / "docs" / "results.md"
@@ -85,18 +83,7 @@ def load_images(db: Session) -> list[ImageRow]:
 
 
 def load_event_detections(db: Session) -> dict[int, list[TriageDet]]:
-    rows = db.execute(
-        select(Image.event_id, Detection.category, Detection.confidence, StaticCluster.status)
-        .join(Image, Detection.image_id == Image.id)
-        .outerjoin(StaticCluster, Detection.static_cluster_id == StaticCluster.id)
-        .where(Image.event_id.is_not(None))
-    ).all()
-    out: dict[int, list[TriageDet]] = defaultdict(list)
-    for event_id, cat, conf, cluster_status in rows:
-        out[event_id].append(
-            TriageDet(cat.value, conf, cluster_status == StaticClusterStatus.confirmed_static)
-        )
-    return out
+    return event_detections(db)  # same ignore rules (static + masks) as production
 
 
 def benchmark(db: Session, n: int) -> dict[str, str] | None:

@@ -21,12 +21,13 @@ export default function ImageWithBoxes({ imageId, detections, minConf, alt }: Pr
         .map((d) => (
           <div
             key={d.id}
-            className={`box box-${d.category}${d.is_static_candidate ? " box-static" : ""}`}
+            className={`box box-${d.category}${d.is_static_candidate ? " box-static" : ""}${d.is_masked ? " box-masked" : ""}`}
             style={boxStyle(d.bbox)}
           >
             <span className="box-label">
               {d.category} {d.confidence.toFixed(2)}
               {d.is_static_candidate ? " · static?" : ""}
+              {d.is_masked ? " · masked" : ""}
             </span>
           </div>
         ))}
