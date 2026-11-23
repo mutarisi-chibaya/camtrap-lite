@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-camtrap}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-camtrap}
+      POSTGRES_DB: ${POSTGRES_DB:-camtrap}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-camtrap}"]
+      interval: 3s
+      retries: 20
+
+  api:
+    build: ./backend
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-camtrap}:${POSTGRES_PASSWORD:-camtrap}@db:5432/${POSTGRES_DB:-camtrap}
+      STORAGE_DIR: /data/storage
+    volumes:
+      - ./data/storage:/data/storage
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    build: ./backend
+    command: python -m worker.run
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-camtrap}:${POSTGRES_PASSWORD:-camtrap}@db:5432/${POSTGRES_DB:-camtrap}
+      STORAGE_DIR: /data/storage
+    volumes:
+      - ./data/storage:/data/storage
+    depends_on:
+      api:
+        condition: service_started
+
+  frontend:
+    build: ./frontend
+    environment:
+      API_PROXY_TARGET: http://api:8000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
